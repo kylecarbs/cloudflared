@@ -26,7 +26,7 @@ require (
 	github.com/gorilla/websocket v1.4.2
 	github.com/json-iterator/go v1.1.12
 	github.com/kylelemons/godebug v1.1.0 // indirect
-	github.com/lucas-clemente/quic-go v0.24.0
+	github.com/lucas-clemente/quic-go v0.25.1-0.20220307142123-ad1cb27c1b64
 	github.com/mattn/go-colorable v0.1.8
 	github.com/miekg/dns v1.1.45
 	github.com/mitchellh/go-homedir v1.1.0
@@ -97,5 +97,3 @@ require (
 )
 
 replace github.com/urfave/cli/v2 => github.com/ipostelnik/cli/v2 v2.3.1-0.20210324024421-b6ea8234fe3d
-
-replace github.com/lucas-clemente/quic-go => github.com/chungthuang/quic-go v0.24.1-0.20220110095058-981dc498cb62

@@ -99,10 +99,6 @@ func populateConfig(config *Config) *Config {
 	} else if maxIncomingUniStreams < 0 {
 		maxIncomingUniStreams = 0
 	}
-	maxDatagrameFrameSize := config.MaxDatagramFrameSize
-	if maxDatagrameFrameSize == 0 {
-		maxDatagrameFrameSize = int64(protocol.DefaultMaxDatagramFrameSize)
-	}
 
 	return &Config{
 		Versions:                         versions,
@@ -114,13 +110,13 @@ func populateConfig(config *Config) *Config {
 		MaxStreamReceiveWindow:           maxStreamReceiveWindow,
 		InitialConnectionReceiveWindow:   initialConnectionReceiveWindow,
 		MaxConnectionReceiveWindow:       maxConnectionReceiveWindow,
+		AllowConnectionWindowIncrease:    config.AllowConnectionWindowIncrease,
 		MaxIncomingStreams:               maxIncomingStreams,
 		MaxIncomingUniStreams:            maxIncomingUniStreams,
 		ConnectionIDLength:               config.ConnectionIDLength,
 		StatelessResetKey:                config.StatelessResetKey,
 		TokenStore:                       config.TokenStore,
 		EnableDatagrams:                  config.EnableDatagrams,
-		MaxDatagramFrameSize:             maxDatagrameFrameSize,
 		DisablePathMTUDiscovery:          config.DisablePathMTUDiscovery,
 		DisableVersionNegotiationPackets: config.DisableVersionNegotiationPackets,
 		Tracer:                           config.Tracer,

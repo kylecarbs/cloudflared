@@ -9,6 +9,8 @@ import (
 	"hash"
 	"log"
 	"net"
+	"os"
+	"strconv"
 	"sync"
 	"time"
 
@@ -110,7 +112,7 @@ func setReceiveBuffer(c net.PacketConn, logger utils.Logger) error {
 	return nil
 }
 
-// only print warnings about the UPD receive buffer size once
+// only print warnings about the UDP receive buffer size once
 var receiveBufferWarningOnce sync.Once
 
 func newPacketHandlerMap(
@@ -122,6 +124,9 @@ func newPacketHandlerMap(
 ) (packetHandlerManager, error) {
 	if err := setReceiveBuffer(c, logger); err != nil {
 		receiveBufferWarningOnce.Do(func() {
+			if disable, _ := strconv.ParseBool(os.Getenv("QUIC_GO_DISABLE_RECEIVE_BUFFER_WARNING")); disable {
+				return
+			}
 			log.Printf("%s. See https://github.com/lucas-clemente/quic-go/wiki/UDP-Receive-Buffer-Size for details.", err)
 		})
 	}

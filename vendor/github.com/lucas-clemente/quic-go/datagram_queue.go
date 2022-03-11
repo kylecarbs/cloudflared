@@ -1,8 +1,6 @@
 package quic
 
 import (
-	"fmt"
-
 	"github.com/lucas-clemente/quic-go/internal/protocol"
 	"github.com/lucas-clemente/quic-go/internal/utils"
 	"github.com/lucas-clemente/quic-go/internal/wire"
@@ -17,7 +15,7 @@ type datagramQueue struct {
 
 	hasData func()
 
-	dequeued chan error
+	dequeued chan struct{}
 
 	logger utils.Logger
 }
@@ -27,7 +25,7 @@ func newDatagramQueue(hasData func(), logger utils.Logger) *datagramQueue {
 		hasData:   hasData,
 		sendQueue: make(chan *wire.DatagramFrame, 1),
 		rcvQueue:  make(chan []byte, protocol.DatagramRcvQueueLen),
-		dequeued:  make(chan error),
+		dequeued:  make(chan struct{}),
 		closed:    make(chan struct{}),
 		logger:    logger,
 	}
@@ -44,23 +42,18 @@ func (h *datagramQueue) AddAndWait(f *wire.DatagramFrame) error {
 	}
 
 	select {
-	case err := <-h.dequeued:
-		return err
+	case <-h.dequeued:
+		return nil
 	case <-h.closed:
 		return h.closeErr
 	}
 }
 
 // Get dequeues a DATAGRAM frame for sending.
-func (h *datagramQueue) Get(maxDatagramSize protocol.ByteCount, version protocol.VersionNumber) *wire.DatagramFrame {
+func (h *datagramQueue) Get() *wire.DatagramFrame {
 	select {
 	case f := <-h.sendQueue:
-		datagramSize := f.Length(version)
-		if datagramSize > maxDatagramSize {
-			h.dequeued <- fmt.Errorf("datagram size %d exceed current limit of %d", datagramSize, maxDatagramSize)
-			return nil
-		}
-		h.dequeued <- nil
+		h.dequeued <- struct{}{}
 		return f
 	default:
 		return nil

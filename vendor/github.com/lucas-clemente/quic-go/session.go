@@ -130,10 +130,6 @@ func (e *errCloseForRecreating) Error() string {
 var sessionTracingID uint64        // to be accessed atomically
 func nextSessionTracingID() uint64 { return atomic.AddUint64(&sessionTracingID, 1) }
 
-func pathMTUDiscoveryEnabled(config *Config) bool {
-	return !disablePathMTUDiscovery && !config.DisablePathMTUDiscovery
-}
-
 // A Session is a QUIC session
 type session struct {
 	// Destination connection ID used during the handshake.
@@ -316,10 +312,7 @@ var newSession = func(
 		RetrySourceConnectionID:         retrySrcConnID,
 	}
 	if s.config.EnableDatagrams {
-		params.MaxDatagramFrameSize = protocol.ByteCount(s.config.MaxDatagramFrameSize)
-		if params.MaxDatagramFrameSize == 0 {
-			params.MaxDatagramFrameSize = protocol.DefaultMaxDatagramFrameSize
-		}
+		params.MaxDatagramFrameSize = protocol.MaxDatagramFrameSize
 	}
 	if s.tracer != nil {
 		s.tracer.SentTransportParameters(params)
@@ -443,7 +436,7 @@ var newClientSession = func(
 		InitialSourceConnectionID:      srcConnID,
 	}
 	if s.config.EnableDatagrams {
-		params.MaxDatagramFrameSize = protocol.ByteCount(s.config.MaxDatagramFrameSize)
+		params.MaxDatagramFrameSize = protocol.MaxDatagramFrameSize
 	}
 	if s.tracer != nil {
 		s.tracer.SentTransportParameters(params)
@@ -509,6 +502,12 @@ func (s *session) preSetup() {
 		protocol.ByteCount(s.config.InitialConnectionReceiveWindow),
 		protocol.ByteCount(s.config.MaxConnectionReceiveWindow),
 		s.onHasConnectionWindowUpdate,
+		func(size protocol.ByteCount) bool {
+			if s.config.AllowConnectionWindowIncrease == nil {
+				return true
+			}
+			return s.config.AllowConnectionWindowIncrease(s, uint64(size))
+		},
 		s.rttStats,
 		s.logger,
 	)
@@ -752,7 +751,7 @@ func (s *session) maybeResetTimer() {
 			deadline = s.idleTimeoutStartTime().Add(s.idleTimeout)
 		}
 	}
-	if s.handshakeConfirmed && pathMTUDiscoveryEnabled(s.config) {
+	if s.handshakeConfirmed && !s.config.DisablePathMTUDiscovery {
 		if probeTime := s.mtuDiscoverer.NextProbeTime(); !probeTime.IsZero() {
 			deadline = utils.MinTime(deadline, probeTime)
 		}
@@ -816,7 +815,7 @@ func (s *session) handleHandshakeConfirmed() {
 	s.sentPacketHandler.SetHandshakeConfirmed()
 	s.cryptoStreamHandler.SetHandshakeConfirmed()
 
-	if pathMTUDiscoveryEnabled(s.config) {
+	if !s.config.DisablePathMTUDiscovery {
 		maxPacketSize := s.peerParams.MaxUDPPayloadSize
 		if maxPacketSize == 0 {
 			maxPacketSize = protocol.MaxByteCount
@@ -1412,7 +1411,7 @@ func (s *session) handleAckFrame(frame *wire.AckFrame, encLevel protocol.Encrypt
 }
 
 func (s *session) handleDatagramFrame(f *wire.DatagramFrame) error {
-	if f.Length(s.version) > protocol.ByteCount(s.config.MaxDatagramFrameSize) {
+	if f.Length(s.version) > protocol.MaxDatagramFrameSize {
 		return &qerr.TransportError{
 			ErrorCode:    qerr.ProtocolViolation,
 			ErrorMessage: "DATAGRAM frame too large",
@@ -1777,7 +1776,7 @@ func (s *session) sendPacket() (bool, error) {
 		s.sendQueue.Send(packet.buffer)
 		return true, nil
 	}
-	if pathMTUDiscoveryEnabled(s.config) && s.mtuDiscoverer.ShouldSendProbe(now) {
+	if !s.config.DisablePathMTUDiscovery && s.mtuDiscoverer.ShouldSendProbe(now) {
 		packet, err := s.packer.PackMTUProbePacket(s.mtuDiscoverer.GetPing())
 		if err != nil {
 			return false, err
