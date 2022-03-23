@@ -46,7 +46,8 @@ func newReconnectCredentialManager(namespace, subsystem string, haConnections in
 		},
 		[]string{"error"},
 	)
-	prometheus.MustRegister(authSuccess, authFail)
+	_ = prometheus.Register(authSuccess)
+	_ = prometheus.Register(authFail)
 	return &reconnectCredentialManager{
 		eventDigest: make(map[uint8][]byte, haConnections),
 		connDigest:  make(map[uint8][]byte, haConnections),
